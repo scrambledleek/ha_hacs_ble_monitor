@@ -2,6 +2,7 @@
 import logging
 
 from .atc import parse_atc
+from .homebrew import parse_homebrew
 from .kegtron import parse_kegtron
 from .miscale import parse_miscale
 from .xiaomi import parse_xiaomi
@@ -20,6 +21,7 @@ def ble_parser(self, data):
     xiaomi_index = data.find(b'\x16\x95\xFE', 15 + 15 if is_ext_packet else 0)
     qingping_index = data.find(b'\x16\xCD\xFD', 15 + 15 if is_ext_packet else 0)
     atc_index = data.find(b'\x16\x1A\x18', 15 + 15 if is_ext_packet else 0)
+    homebrew_index = data.find(b'\x16\x1A\x19', 15 + 15 if is_ext_packet else 0)
     miscale_v1_index = data.find(b'\x16\x1D\x18', 15 + 15 if is_ext_packet else 0)
     miscale_v2_index = data.find(b'\x16\x1B\x18', 15 + 15 if is_ext_packet else 0)
     kegtron_index = data.find(b'\x1E\xFF\xFF\xFF', 14 + 15 if is_ext_packet else 0)
@@ -30,6 +32,8 @@ def ble_parser(self, data):
         return parse_qingping(self, data, qingping_index, is_ext_packet)
     elif atc_index != -1:
         return parse_atc(self, data, atc_index, is_ext_packet)
+    elif homebrew_index != -1:
+        return parse_homebrew(self, data, homebrew_index, is_ext_packet)
     elif miscale_v1_index != -1:
         return parse_miscale(self, data, miscale_v1_index, is_ext_packet)
     elif miscale_v2_index != -1:

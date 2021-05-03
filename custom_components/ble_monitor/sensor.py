@@ -106,8 +106,8 @@ class BLEupdater():
                         break
             return temp
 
-        async def async_add_sensor(mac, sensortype, firmware):
-            t_i, h_i, m_i, p_i, c_i, i_i, f_i, cn_i, bu_i, w_i, nw_i, im_i, vd_i, to_i, v_i, b_i = MMTS_DICT[sensortype][0]
+        async def async_add_sensor(mac, sensortype, firmware, data):
+            t_i, h_i, m_i, p_i, c_i, pc_i, i_i, f_i, cn_i, bu_i, w_i, nw_i, im_i, vd_i, to_i, v_i, b_i = MMTS_DICT[sensortype][0]
             if mac not in sensors_by_mac:
                 sensors = []
                 if t_i != 9:
@@ -146,6 +146,23 @@ class BLEupdater():
                     sensors.insert(v_i, VoltageSensor(self.config, mac, sensortype, firmware))
                 if self.batt_entities and (b_i != 9):
                     sensors.insert(b_i, BatterySensor(self.config, mac, sensortype, firmware))
+
+                # Append any counter sensors to the sensors list.
+                # We only do this if data is present as otherwise we don't know how many
+                # counters there are to add.
+                if pc_i != 9 and data is not None:
+                    # We support a list of counters - check data for counter[0-9]+ and append
+                    # the sensors.  If we don't have data, just add counter0.
+                    # We update pc_i to the index of our first counter within the sensors list.
+                    pc_i = len(sensors)
+                    index = 0
+                    if data is None:
+                        sensors.append(CounterSensor(self.config, mac, sensortype, firmware, index))
+                    else:
+                        while ("counter" + str(index)) in data:
+                            sensors.append(CounterSensor(self.config, mac, sensortype, firmware, index))
+                            index += 1
+
                 if len(sensors) != 0:
                     sensors_by_mac[mac] = sensors
                     self.add_entities(sensors)
@@ -176,7 +193,7 @@ class BLEupdater():
                     mac = mac.replace(":", "")
                     sensortype = dev.model
                     firmware = dev.sw_version
-                    sensors = await async_add_sensor(mac, sensortype, firmware)
+                    sensors = await async_add_sensor(mac, sensortype, firmware, None)
                 else:
                     pass
         else:
@@ -205,8 +222,8 @@ class BLEupdater():
                 batt_attr = None
                 sensortype = data["type"]
                 firmware = data["firmware"]
-                t_i, h_i, m_i, p_i, c_i, i_i, f_i, cn_i, bu_i, w_i, nw_i, im_i, vd_i, to_i, v_i, b_i = MMTS_DICT[sensortype][0]
-                sensors = await async_add_sensor(mac, sensortype, firmware)
+                t_i, h_i, m_i, p_i, c_i, pc_i, i_i, f_i, cn_i, bu_i, w_i, nw_i, im_i, vd_i, to_i, v_i, b_i = MMTS_DICT[sensortype][0]
+                sensors = await async_add_sensor(mac, sensortype, firmware, data)
 
                 if data["data"] is False:
                     data = None
@@ -262,6 +279,12 @@ class BLEupdater():
                     sensors[c_i].collect(data, batt_attr)
                 if "pressure" in data and (p_i != 9):
                     sensors[p_i].collect(data, batt_attr)
+                if "counter0" in data and (pc_i != 9):
+                    sensors[pc_i].collect(data, batt_attr)
+                    index = 1
+                    while ("counter" + str(index)) in data:
+                        sensors[pc_i + index].collect(data, batt_attr)
+                        index += 1
                 if "moisture" in data and (m_i != 9):
                     sensors[m_i].collect(data, batt_attr)
                 if "illuminance" in data and (i_i != 9):
@@ -670,6 +693,25 @@ class ConductivitySensor(MeasuringSensor):
     def icon(self):
         """Return the icon of the sensor."""
         return "mdi:flash-circle"
+
+
+class CounterSensor(MeasuringSensor):
+    """Representation of a Sensor."""
+
+    # Has an index as we support multiple counters from a single device
+    def __init__(self, config, mac, devtype, firmware, index):
+        """Initialize the sensor."""
+        super().__init__(config, mac, devtype, firmware)
+        self._measurement = "counter" + str(index)
+        self._name = "ble counter" + str(index) + " {}".format(self._device_name)
+        self._unique_id = "pc_" + self._device_name + "_" + str(index)
+        self._unit_of_measurement = None
+        self._device_class = None
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return "mdi:counter"
 
 
 class IlluminanceSensor(MeasuringSensor):
