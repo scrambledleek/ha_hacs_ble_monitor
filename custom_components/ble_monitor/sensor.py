@@ -1,6 +1,7 @@
 """Passive BLE monitor sensor platform."""
 from datetime import timedelta
 import asyncio
+import copy
 import logging
 import statistics as sts
 
@@ -81,7 +82,7 @@ class BLEupdater:
     async def async_run(self, hass):
         """Entities updater loop."""
 
-        async def async_add_sensor(mac, sensortype, firmware):
+        async def async_add_sensor(mac, sensortype, firmware, data):
             averaging_sensors = MEASUREMENT_DICT[sensortype][0]
             instant_sensors = MEASUREMENT_DICT[sensortype][1]
             device_sensors = averaging_sensors + instant_sensors
@@ -97,6 +98,18 @@ class BLEupdater:
                             self.config, mac, sensortype, firmware, description
                         ),
                     )
+
+                # Append any counter sensors to the sensors list
+                if 'counter0' in data:
+                    # We support a list of counters - check data for counter[0-9]+ and append
+                    # the sensors (no gaps allowed).
+                    description = [item for item in SENSOR_TYPES if item.key is "counter"][0]
+                    index = 0
+                    while ("counter" + str(index) in data):
+                        sensors.append(CounterSensor(self.config, mac, sensortype, firmware, description, index))
+                        index += 1
+                    _LOGGER.debug("Added %s counter sensors", index)
+
                 if len(sensors) != 0:
                     sensors_by_mac[mac] = sensors
                     self.add_entities(sensors)
@@ -135,7 +148,7 @@ class BLEupdater:
                         sensortype = RENAMED_MODEL_DICT[dev.model]
                     firmware = dev.sw_version
                     if sensortype and firmware:
-                        sensors = await async_add_sensor(mac, sensortype, firmware)
+                        sensors = await async_add_sensor(mac, sensortype, firmware, [])
                     else:
                         continue
                 else:
@@ -172,7 +185,8 @@ class BLEupdater:
                 averaging_sensors = MEASUREMENT_DICT[sensortype][0]
                 instant_sensors = MEASUREMENT_DICT[sensortype][1]
                 device_sensors = averaging_sensors + instant_sensors
-                sensors = await async_add_sensor(mac, sensortype, firmware)
+                sensors = await async_add_sensor(mac, sensortype, firmware, data)
+
                 if data["data"] is False:
                     data = None
                     continue
@@ -203,6 +217,17 @@ class BLEupdater:
                                     entity.rssi_values = rssi[mac].copy()
                                     entity.async_schedule_update_ha_state(True)
                                     entity.pending_update = False
+
+                # For flexible devices...currently only support counter devices
+                if "counter0" in data:
+                    entityIndex = len(device_sensors)
+                    sensors[entityIndex].collect(data, batt_attr)
+                    index = 1
+                    while ("counter" + str(index) in data):
+                        sensors[entityIndex + index].collect(data, batt_attr)
+                        index += 1
+                    _LOGGER.debug("Stored %s counter readings", index)
+
                 data = None
             ts_now = dt_util.now()
             if ts_now - ts_last_update < timedelta(seconds=self.period):
@@ -258,7 +283,8 @@ class BaseSensor(RestoreEntity, SensorEntity):
     # |  |  |**weight
     # |  |  |**non-stabilized weight
     # |  |**ImpedanceSensor
-    # |  |--EnergySensor (Class)
+    # |  |**CounterSensor
+    # |--EnergySensor (Class)
     # |  |  |**energy
     # |  |--PowerSensor (Class)
     # |  |  |**power
@@ -327,6 +353,7 @@ class BaseSensor(RestoreEntity, SensorEntity):
             "sw_version": firmware,
             "manufacturer": self._device_manufacturer,
         }
+        _LOGGER.debug("Sensor init: %s", self)
 
     async def async_added_to_hass(self):
         """Handle entity which will be added."""
@@ -800,6 +827,34 @@ class PowerSensor(InstantUpdateSensor):
             )
         if "constant" in data:
             self._extra_state_attributes["constant"] = data["constant"]
+        if batt_attr is not None:
+            self._extra_state_attributes[ATTR_BATTERY_LEVEL] = batt_attr
+        self.pending_update = True
+
+
+class CounterSensor(InstantUpdateSensor):
+    """Representation of a counter sensor."""
+
+    # Has an index as we support multiple counters from a single device
+    def __init__(self, config, mac, devtype, firmware, description, index):
+        """Initialize the sensor."""
+        desc = copy.copy(description)
+        desc.key = "counter" + str(index)
+        desc.name = "ble counter" + str(index)
+        desc.unique_id = "pc" + str(index) + "_" + mac
+        super().__init__(config, mac, devtype, firmware, desc)
+        _LOGGER.debug("Initialised counter%s (%s)", index, desc)
+
+    def collect(self, data, period_cnt, batt_attr=None):
+        """Measurements collector."""
+        if self.enabled is False:
+            self.pending_update = False
+            return
+        _LOGGER.debug("Storing %s reading %s (self is %s)", self.entity_description.key, data[self.entity_description.key], self)
+        self._state = data[self.entity_description.key]
+        self._extra_state_attributes["sensor type"] = data["type"]
+        self._extra_state_attributes["last packet id"] = data["packet"]
+        self._extra_state_attributes["firmware"] = data["firmware"]
         if batt_attr is not None:
             self._extra_state_attributes[ATTR_BATTERY_LEVEL] = batt_attr
         self.pending_update = True
