@@ -408,6 +408,16 @@ SENSOR_TYPES: tuple[BLEMonitorSensorEntityDescription, ...] = (
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     BLEMonitorSensorEntityDescription(
+        key="counter",
+        sensor_class="InstantUpdateSensor",
+        name="ble counter",
+        unique_id="pc_",
+        icon="mdi:counter",
+        native_unit_of_measurement=None,
+        device_class=None,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
+    BLEMonitorSensorEntityDescription(
         key="energy",
         sensor_class="EnergySensor",
         name="ble energy",
@@ -589,8 +599,8 @@ SENSOR_TYPES: tuple[BLEMonitorSensorEntityDescription, ...] = (
 
 
 # Dictionary with supported sensors
-# Format {device: [averaging sensor list], [instantly updating sensor list],[binary sensor list]}:
-# - [averaging sensor list]:            sensors that update the state after avering of the data
+# Format {device: [averaging sensor list], [instantly updating sensor list], [binary sensor list]}:
+# - [averaging sensor list]:            sensors that update the state after averaging of the data
 # - [instantly updating sensor list]:   sensors that update the state instantly after new data
 # - [binary sensor list]:               binary sensors
 MEASUREMENT_DICT = {
@@ -636,6 +646,7 @@ MEASUREMENT_DICT = {
     'YLYB01YL-BHFRC'          : [["rssi"], ["bathroom heater remote"], []],
     'YLKG07YL/YLKG08YL'       : [["rssi"], ["dimmer"], []],
     'ATC'                     : [["temperature", "humidity", "battery", "voltage", "rssi"], [], []],
+    'HB-PC01'                 : [[], [], []], # We have no fixed sensors - they must be detected when data comes in
     'Mi Scale V1'             : [["rssi"], ["weight", "non-stabilized weight"], ["weight removed"]],
     'Mi Scale V2'             : [["rssi"], ["weight", "non-stabilized weight", "impedance"], ["weight removed"]],
     'TZC4'                    : [["rssi"], ["weight", "non-stabilized weight", "impedance"], []],
@@ -718,6 +729,7 @@ MANUFACTURER_DICT = {
     'K9B-2BTN'                : 'Linptech',
     'K9B-3BTN'                : 'Linptech',
     'ATC'                     : 'ATC',
+    'HB-PC01'                 : 'Homebrew',
     'Mi Scale V1'             : 'Xiaomi',
     'Mi Scale V2'             : 'Xiaomi',
     'TZC4'                    : 'Xiaogui',

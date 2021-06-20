@@ -542,7 +542,13 @@ class HCIdump(Thread):
             binary_list = MEASUREMENT_DICT[device_type][2] + ["battery"]
             measuring = any(x in measurements for x in sensor_list)
             binary = any(x in measurements for x in binary_list)
-            if binary == measuring:
+
+            # Special case for Homebrew devices which are 'dynamic'.
+            # TODO: Only support counters for now...will want a Homebrew type
+            # dictionary to search through in future.
+            measuring |= "counter0" in measurements
+
+            if measuring and binary == measuring:
                 self.dataqueue_bin.sync_q.put_nowait(sensor_msg)
                 self.dataqueue_meas.sync_q.put_nowait(sensor_msg)
             else:
