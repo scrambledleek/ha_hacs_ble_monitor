@@ -5,6 +5,7 @@ from .atc import parse_atc
 from .bluemaestro import parse_bluemaestro
 from .brifit import parse_brifit
 from .govee import parse_govee
+from .homebrew import parse_homebrew
 from .kegtron import parse_kegtron
 from .miscale import parse_miscale
 from .inode import parse_inode
@@ -86,6 +87,9 @@ class BleParser:
                         break
                     elif uuid16 == 0x181A:  # UUID16 = ATC
                         sensor_data = parse_atc(self, adstruct, mac, rssi)
+                        break
+                    elif uuid16 == 0x191A:  # UUID16 = Homebrew
+                        sensor_data = parse_homebrew(self, adstruct, mac, rssi)
                         break
                     elif uuid16 == 0xFE95:  # UUID16 = Xiaomi
                         sensor_data = parse_xiaomi(self, adstruct, mac, rssi)
