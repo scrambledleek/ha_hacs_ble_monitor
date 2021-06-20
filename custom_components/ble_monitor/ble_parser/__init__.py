@@ -5,6 +5,7 @@ import subprocess
 from .atc import parse_atc
 from .brifit import parse_brifit
 from .govee import parse_govee
+from .homebrew import parse_homebrew
 from .kegtron import parse_kegtron
 from .miscale import parse_miscale
 from .xiaomi import parse_xiaomi
@@ -57,6 +58,8 @@ def ble_parser(self, data):
                     return parse_qingping(self, adstruct, mac, rssi)
                 elif uuid16 == 0x181A:  # UUID16 = ATC
                     return parse_atc(self, adstruct, mac, rssi)
+                elif uuid16 == 0x191A:  # UUID16 = Homebrew
+                    return parse_homebrew(self, adstruct, mac, rssi)
                 elif uuid16 == 0xFE95:  # UUID16 = Xiaomi
                     return parse_xiaomi(self, adstruct, mac, rssi)
                 elif uuid16 == 0x181D or uuid16 == 0x181B:  # UUID16 = Mi Scale

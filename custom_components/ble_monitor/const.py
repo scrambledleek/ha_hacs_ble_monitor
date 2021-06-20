@@ -86,6 +86,7 @@ SENSOR_DICT = {
     "three btn switch left":    "TripleSwitchLeftSensor",
     "three btn switch middle":  "TripleSwitchMiddleSensor",
     "three btn switch right":   "TripleSwitchRightSensor",
+    "counter":                  "CounterSensor",
 }
 
 
@@ -104,8 +105,8 @@ BINARY_SENSOR_DICT = {
 
 
 # Dictionary with supported sensors
-# Format {device: [averaging sensor list], [instantly updating sensor list],[binary sensor list]}:
-# - [averaging sensor list]:            sensors that update the state after avering of the data
+# Format {device: [averaging sensor list], [instantly updating sensor list], [binary sensor list]}:
+# - [averaging sensor list]:            sensors that update the state after averaging of the data
 # - [instantly updating sensor list]:   sensors that update the state instantly after new data
 # - [binary sensor list]:               binary sensors
 MEASUREMENT_DICT = {
@@ -148,6 +149,7 @@ MEASUREMENT_DICT = {
     'YLYB01YL-BHFRC'          : [[], ["bathroom heater remote"], []],
     'YLKG07YL/YLKG08YL'       : [[], ["dimmer"], []],
     'ATC'                     : [["temperature", "humidity", "battery", "voltage"], [], []],
+    'HB-PC01'                 : [[], [], []], # We have no fixed sensors - they must be detected when data comes in
     'Mi Scale V1'             : [[], ["weight", "non-stabilized weight"], ["weight removed"]],
     'Mi Scale V2'             : [[], ["weight", "non-stabilized weight", "impedance"], ["weight removed"]],
     'Kegtron KT-100'          : [[], ["volume dispensed port 1"], []],
@@ -202,6 +204,7 @@ MANUFACTURER_DICT = {
     'K9B-2BTN'                : 'Linptech',
     'K9B-3BTN'                : 'Linptech',
     'ATC'                     : 'ATC',
+    'HB-PC01'                 : 'Homebrew',
     'Mi Scale V1'             : 'Xiaomi',
     'Mi Scale V2'             : 'Xiaomi',
     'Kegtron KT-100'          : 'Kegtron',

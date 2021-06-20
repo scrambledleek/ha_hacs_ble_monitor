@@ -92,7 +92,7 @@ class BLEupdater():
     async def async_run(self, hass):
         """Entities updater loop."""
 
-        async def async_add_sensor(mac, sensortype, firmware):
+        async def async_add_sensor(mac, sensortype, firmware, data):
             averaging_sensors = MEASUREMENT_DICT[sensortype][0]
             instant_sensors = MEASUREMENT_DICT[sensortype][1]
             device_sensors = averaging_sensors + instant_sensors
@@ -103,6 +103,17 @@ class BLEupdater():
                         device_sensors.index(sensor),
                         globals()[SENSOR_DICT[sensor]](self.config, mac, sensortype, firmware),
                     )
+
+                # Append any counter sensors to the sensors list
+                if 'counter0' in data:
+                    # We support a list of counters - check data for counter[0-9]+ and append
+                    # the sensors (no gaps allowed).
+                    index = 0
+                    while ("counter" + str(index) in data):
+                        sensors.append(CounterSensor(self.config, mac, sensortype, firmware, index))
+                        index += 1
+                    _LOGGER.debug("Added %s counter sensors", index)
+
                 if len(sensors) != 0:
                     sensors_by_mac[mac] = sensors
                     self.add_entities(sensors)
@@ -134,7 +145,7 @@ class BLEupdater():
                     mac = mac.replace(":", "")
                     sensortype = dev.model
                     firmware = dev.sw_version
-                    sensors = await async_add_sensor(mac, sensortype, firmware)
+                    sensors = await async_add_sensor(mac, sensortype, firmware, [])
                 else:
                     pass
         else:
@@ -166,7 +177,8 @@ class BLEupdater():
                 averaging_sensors = MEASUREMENT_DICT[sensortype][0]
                 instant_sensors = MEASUREMENT_DICT[sensortype][1]
                 device_sensors = averaging_sensors + instant_sensors
-                sensors = await async_add_sensor(mac, sensortype, firmware)
+                sensors = await async_add_sensor(mac, sensortype, firmware, data)
+
                 if data["data"] is False:
                     data = None
                     continue
@@ -194,6 +206,17 @@ class BLEupdater():
                                     entity.rssi_values = rssi[mac].copy()
                                     entity.async_schedule_update_ha_state(True)
                                     entity.pending_update = False
+
+                # For flexible devices...currently only support counter devices
+                if "counter0" in data:
+                    entityIndex = len(device_sensors)
+                    sensors[entityIndex].collect(data, batt_attr)
+                    index = 1
+                    while ("counter" + str(index) in data):
+                        sensors[entityIndex + index].collect(data, batt_attr)
+                        index += 1
+                    _LOGGER.debug("Stored %s counter readings", index)
+
                 data = None
             ts_now = dt_util.now()
             if ts_now - ts_last < timedelta(seconds=self.period):
@@ -240,6 +263,7 @@ class BaseSensor(RestoreEntity):
     # |  |--WeightSensor
     # |  |--NonStabilizedWeightSensor
     # |  |--ImpedanceSensor
+    # |  |--CounterSensor
     # |  |--SwitchSensor
     # |  |  |--SingleSwitchSensor
     # |  |  |--DoubleSwitchLeftSensor
@@ -906,6 +930,25 @@ class ImpedanceSensor(InstantUpdateSensor):
     def icon(self):
         """Return the icon of the sensor."""
         return "mdi:omega"
+
+
+class CounterSensor(InstantUpdateSensor):
+    """Representation of a Sensor."""
+
+    # Has an index as we support multiple counters from a single device
+    def __init__(self, config, mac, devtype, firmware, index):
+        """Initialize the sensor."""
+        super().__init__(config, mac, devtype, firmware)
+        self._measurement = "counter" + str(index)
+        self._name = "ble counter" + str(index) + " {}".format(self._device_name)
+        self._unique_id = "pc_" + self._device_name + "_" + str(index)
+        self._unit_of_measurement = None
+        self._device_class = None
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return "mdi:counter"
 
 
 class SwitchSensor(InstantUpdateSensor):
