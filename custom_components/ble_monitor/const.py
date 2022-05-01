@@ -938,8 +938,8 @@ SENSOR_TYPES: tuple[BLEMonitorSensorEntityDescription, ...] = (
 
 
 # Dictionary with supported sensors
-# Format {device: [averaging sensor list], [instantly updating sensor list],[binary sensor list]}:
-# - [averaging sensor list]:            sensors that update the state after avering of the data
+# Format {device: [averaging sensor list], [instantly updating sensor list], [binary sensor list]}:
+# - [averaging sensor list]:            sensors that update the state after averaging of the data
 # - [instantly updating sensor list]:   sensors that update the state instantly after new data
 # - [binary sensor list]:               binary sensors
 MEASUREMENT_DICT = {
