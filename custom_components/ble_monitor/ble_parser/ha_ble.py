@@ -88,6 +88,7 @@ def parse_ha_ble(self, data, uuid16, source_mac, rssi):
     ha_ble_mac = source_mac
     result = {}
     packet_id = None
+    type_instance = [0] * len(DATA_MEAS_DICT)
 
     if uuid16 == 0x181C:
         # Non-encrypted HA BLE format
@@ -129,7 +130,12 @@ def parse_ha_ble(self, data, uuid16, source_mac, rssi):
                     meas_type = DATA_MEAS_DICT[obj_meas_type][0]
                     meas_factor = DATA_MEAS_DICT[obj_meas_type][1]
                     meas = dispatch[obj_data_format](meas_data, meas_factor)
-                    result.update({meas_type: meas})
+                    append_index = ""
+                    # We add an instance index for anything that isn't a packet number
+                    if obj_meas_type > 0:
+                        append_index = "_" + str(type_instance[obj_meas_type])
+                    result.update({meas_type + append_index: meas})
+                    type_instance[obj_meas_type] += 1
                 else:
                     if self.report_unknown == "HA BLE":
                         _LOGGER.error("UNKNOWN dataobject in HA BLE payload! Adv: %s", data.hex())
