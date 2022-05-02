@@ -1,8 +1,10 @@
 """Passive BLE monitor sensor platform."""
 from datetime import timedelta
 import asyncio
+import copy
 import logging
 import statistics as sts
+import re
 
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
@@ -130,7 +132,24 @@ class BLEupdater:
                     if key not in sensors_by_key:
                         sensors_by_key[key] = {}
                     if measurement not in sensors_by_key[key]:
-                        description = [item for item in SENSOR_TYPES if item.key is measurement][0]
+                        meas_no_index = measurement
+                        has_index_re = re.search("^(.*)_([0-9]+)$", measurement)
+                        if has_index_re:
+                            meas_no_index = has_index_re.group(1)
+
+                        # The default SENSOR_TYPES descriptions have no indicies so we have to
+                        # match the measurement name without any appended index.
+                        description = [item for item in SENSOR_TYPES if item.key == meas_no_index][0]
+
+                        # Update the description.key, name and unique_id fields if there was an index.
+                        # We need to use a copy of the original description to do this or it will be
+                        # changed for every sensor of that type.
+                        if has_index_re:
+                            index = has_index_re.group(2)
+                            description = copy.copy(description)
+                            description.key = measurement
+                            description.name = "ble count " + index
+                            description.unique_id += index + "_"
                         sensors[measurement] = globals()[description.sensor_class](
                             self.config, key, device_model, firmware, description, manufacturer
                         )
@@ -241,9 +260,16 @@ class BLEupdater:
                 manufacturer = data["manufacturer"] if "manufacturer" in data else None
                 auto_sensors = set()
                 if device_model in AUTO_MANUFACTURER_DICT:
-                    for measurement in AUTO_SENSOR_LIST:
-                        if measurement in data:
-                            auto_sensors.add(measurement)
+                    for entry in data.keys():
+                        meas_name = entry
+                        meas_index = -1
+                        has_index_re = re.search("^(.*)_([0-9]+)$", entry)
+                        if has_index_re:
+                            meas_name = has_index_re.group(1)
+                            meas_index = has_index_re.group(2)
+                        if meas_name in AUTO_SENSOR_LIST:
+                            auto_sensors.add(entry)
+
                 sensors = await async_add_sensor(
                     key, device_model, firmware, auto_sensors, manufacturer
                 )
