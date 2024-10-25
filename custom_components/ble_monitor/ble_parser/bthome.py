@@ -270,7 +270,7 @@ def parse_payload(self, payload, sw_version):
 
         meas_type = MEAS_TYPES[meas["measurement type"]]
         meas_unit = meas_type.unit_of_measurement
-        meas_format = meas_type.meas_format
+        meas_format = meas_type.meas_format + postfix
         meas_factor = meas_type.factor
         value: None | str | int | float | datetime
         event_property = None
