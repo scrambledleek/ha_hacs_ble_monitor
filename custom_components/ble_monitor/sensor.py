@@ -1,6 +1,8 @@
 """Passive BLE monitor sensor platform."""
 import asyncio
+import copy
 import logging
+import re
 import statistics as sts
 from datetime import timedelta
 
@@ -97,7 +99,26 @@ class BLEupdater:
                     if key not in sensors_by_key:
                         sensors_by_key[key] = {}
                     if measurement not in sensors_by_key[key]:
-                        entity_description = [item for item in SENSOR_TYPES if item.key is measurement][0]
+                        # We need to cope with BTHome sensors which have multiple measurements of the same
+                        # type with a _<num> postfix appended to the measurement name.
+                        meas_no_postfix = measurement
+                        has_postfix_re = re.search("^(.*)_([0-9]+)$", measurement)
+                        if has_postfix_re:
+                            meas_no_postfix = has_postfix_re.group(1)
+                        # The default SENSOR_TYPES descriptions have no postfixes so we have to
+                        # match the measurement name without any appended postfix.
+                        entity_description = [item for item in SENSOR_TYPES if item.key == meas_no_postfix][0]
+
+                        # Update the entity_description.key, name and unique_id fields if there was a postfix.
+                        # We need to use a copy of the original entity_description to do this or it will be
+                        # changed for every sensor of that type.
+                        if has_postfix_re:
+                            postfix = has_postfix_re.group(2)
+                            entity_description = copy.copy(entity_description)
+                            entity_description.key = measurement
+                            entity_description.name = "ble " + meas_no_postfix + " " + postfix
+                            entity_description.unique_id += postfix + "_"
+
                         sensors[measurement] = globals()[entity_description.sensor_class](
                             self.config, key, device_model, firmware, entity_description, manufacturer
                         )
@@ -212,9 +233,15 @@ class BLEupdater:
                 manufacturer = RENAMED_MANUFACTURER_DICT.get(manufacturer, manufacturer)
                 auto_sensors = set()
                 if device_model in AUTO_MANUFACTURER_DICT:
-                    for measurement in AUTO_SENSOR_LIST:
-                        if measurement in data:
-                            auto_sensors.add(measurement)
+                    for entry in data.keys():
+                        # We need to cope with BTHome multiple readings of the same type data packets
+                        # where an _<num> postfix has been added to the name of the measurements.
+                        meas_name = entry
+                        has_postfix_re = re.search("^(.*)_([0-9]+)$", entry)
+                        if has_postfix_re:
+                            meas_name = has_postfix_re.group(1)
+                        if meas_name in AUTO_SENSOR_LIST:
+                            auto_sensors.add(entry)
                 sensors = await async_add_sensor(
                     key, device_model, firmware, auto_sensors, manufacturer
                 )
